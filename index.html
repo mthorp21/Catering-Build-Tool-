@@ -383,9 +383,60 @@
     padding: 2px 8px; border-radius: 10px;
   }
 
+
+
+  /* ── Plates toggle ──────────────────────────────────── */
+  .plates-toggle {
+    display: flex; align-items: center; gap: 8px;
+    cursor: pointer; height: 34px; padding: 0 10px;
+    border: 1px solid #dde3e1; border-radius: 4px;
+    background: #f4f6f5; font-size: 12px; font-weight: 600;
+    color: #2a2a2a; white-space: nowrap;
+    user-select: none; transition: background 0.1s, border-color 0.1s;
+  }
+  .plates-toggle:has(input:checked) {
+    background: #eaf3de; border-color: #99c961; color: #3B6D11;
+  }
+  .plates-toggle input { accent-color: #3c5c68; width: 15px; height: 15px; cursor: pointer; }
+
+  /* ── Order Info Fields ──────────────────────────────── */
+  .order-info-bar {
+    display: flex; gap: 14px; flex-wrap: wrap;
+    background: #ffffff; border: 1px solid #dde3e1;
+    border-radius: 6px; padding: 14px 18px;
+    margin-bottom: 16px; align-items: flex-end;
+    max-width: 900px;
+  }
+  .order-info-field { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 160px; }
+  .order-info-field label { font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #4d4d4d; }
+  .order-info-input {
+    height: 34px; padding: 0 10px;
+    border: 1px solid #dde3e1; border-radius: 4px;
+    font-size: 13px; font-weight: 500; color: #2a2a2a;
+    font-family: inherit; background: #f4f6f5;
+    width: 100%;
+  }
+  .order-info-input:focus { outline: none; border-color: #3c5c68; background: #ffffff; }
+  .order-info-divider { width: 1px; background: #dde3e1; align-self: stretch; margin: 0 4px; }
+
+  /* ── Order header on print sheets ──────────────────── */
+  .print-order-header {
+    display: none;
+    border-bottom: 2px solid #3c5c68;
+    padding-bottom: 10px; margin-bottom: 18px;
+  }
+  .print-order-header .poh-title { font-size: 18px; font-weight: 700; color: #3c5c68; }
+  .print-order-header .poh-meta { display: flex; gap: 24px; margin-top: 6px; flex-wrap: wrap; }
+  .print-order-header .poh-meta span { font-size: 11px; color: #4d4d4d; }
+  .print-order-header .poh-meta strong { color: #2a2a2a; }
+
   @media print {
     body { background: white; font-size: 11px; }
     .tabs, .top-bar, .order-actions, .checklist-actions, .btn, .qty-btn, .qty-wrap { display: none !important; }
+
+    .print-order-header { display: block !important; }
+    .order-info-bar { display: none !important; }
+
     .panel { display: block !important; padding: 0; }
     #panel-order { display: none !important; }
     .checklist-progress { break-inside: avoid; }
@@ -414,6 +465,35 @@
 
   <!-- ══ TAB 1: ORDER ENTRY ══════════════════════════════ -->
   <div id="panel-order" class="panel active">
+    <div class="order-info-bar">
+      <div class="order-info-field">
+        <label for="order-name">Catering Name</label>
+        <input class="order-info-input" id="order-name" type="text" placeholder="e.g. Smith Wedding" oninput="updatePrintHeaders()">
+      </div>
+      <div class="order-info-divider"></div>
+      <div class="order-info-field">
+        <label for="order-date">Date</label>
+        <input class="order-info-input" id="order-date" type="date" oninput="updatePrintHeaders()">
+      </div>
+      <div class="order-info-divider"></div>
+      <div class="order-info-field">
+        <label for="order-time">Time Due</label>
+        <input class="order-info-input" id="order-time" type="time" oninput="updatePrintHeaders()">
+      </div>
+      <div class="order-info-divider"></div>
+      <div class="order-info-field" style="min-width:100px;max-width:120px">
+        <label for="order-guests">Guests</label>
+        <input class="order-info-input" id="order-guests" type="number" min="0" placeholder="0" oninput="updatePrintHeaders()">
+      </div>
+      <div class="order-info-divider"></div>
+      <div class="order-info-field" style="min-width:140px;flex:0">
+        <label>&nbsp;</label>
+        <label class="plates-toggle">
+          <input type="checkbox" id="plates-check" onchange="updatePrintHeaders()">
+          <span class="plates-toggle-label">Plates &amp; Silverware</span>
+        </label>
+      </div>
+    </div>
     <div class="order-actions">
       <button class="btn btn-primary" onclick="switchTab('build')">View Build Sheet →</button>
       <button class="btn btn-ghost" onclick="clearAll()">Clear All</button>
@@ -424,6 +504,16 @@
 
   <!-- ══ TAB 2: BUILD SHEET ══════════════════════════════ -->
   <div id="panel-build" class="panel">
+    <div class="print-order-header" id="poh-build">
+      <div class="poh-title">Morning Belle — Catering Build Sheet</div>
+      <div class="poh-meta">
+        <span><strong id="poh-build-name"></strong></span>
+        <span>Date: <strong id="poh-build-date"></strong></span>
+        <span>Time Due: <strong id="poh-build-time"></strong></span>
+        <span id="poh-build-guests" style="color:#3c5c68;font-weight:600"></span>
+      </div>
+    </div>
+
     <div class="order-actions">
       <button class="btn btn-green" onclick="printBuild()">Print / Save PDF</button>
       <button class="btn btn-ghost" onclick="switchTab('order')">← Back to Order</button>
@@ -433,6 +523,16 @@
 
   <!-- ══ TAB 3: BAG CHECKLIST ════════════════════════════ -->
   <div id="panel-checklist" class="panel">
+    <div class="print-order-header" id="poh-checklist">
+      <div class="poh-title">Morning Belle — Catering Bag Checklist</div>
+      <div class="poh-meta">
+        <span><strong id="poh-checklist-name"></strong></span>
+        <span>Date: <strong id="poh-checklist-date"></strong></span>
+        <span>Time Due: <strong id="poh-checklist-time"></strong></span>
+        <span id="poh-checklist-guests" style="color:#3c5c68;font-weight:600"></span>
+      </div>
+    </div>
+
     <div class="checklist-actions">
       <button class="btn btn-green" onclick="printChecklist()">Print / Save PDF</button>
       <button class="btn btn-ghost" onclick="uncheckAll()">Uncheck All</button>
@@ -859,6 +959,28 @@ function renderChecklist() {
     html += '</div></div>';
   });
 
+  // Plates & silverware row
+  const guestCount = parseInt(document.getElementById('order-guests').value) || 0;
+  const platesOn   = document.getElementById('plates-check').checked;
+  if (platesOn && guestCount > 0) {
+    const platesQty = guestCount + 5;
+    const plateKey  = '__plates__';
+    const isChecked = checked[plateKey] || false;
+    html += `<div class="checklist-dish">
+      <div class="checklist-dish-header" style="background:#4d4d4d">
+        <span>PLATES &amp; SILVERWARE</span>
+      </div>
+      <div class="checklist-items">
+        <div class="check-row${isChecked ? ' checked' : ''}" onclick="toggleCheck('${plateKey}')" data-key="${plateKey}" style="background:${isChecked?'#d6f0c2':'#ffffff'}">
+          <div class="check-box"><span class="check-box-tick">✓</span></div>
+          <span class="check-item-name">Plates &amp; Silverware Sets</span>
+          <span class="check-qty">${platesQty}</span>
+          <span style="font-size:11px;color:#888;margin-left:4px">(${guestCount} guests + 5)</span>
+        </div>
+      </div>
+    </div>`;
+  }
+
   contentEl.innerHTML = html;
 }
 
@@ -876,8 +998,10 @@ function toggleCheck(key) {
 }
 
 function updateProgress(selected) {
-  const total = selected.length;
-  const done  = selected.filter(d => checked[d.id]).length;
+  const platesOn = document.getElementById('plates-check') && document.getElementById('plates-check').checked;
+  const platesExtra = platesOn && (parseInt(document.getElementById('order-guests').value)||0) > 0 ? 1 : 0;
+  const total = selected.length + platesExtra;
+  const done  = selected.filter(d => checked[d.id]).length + (platesExtra && checked['__plates__'] ? 1 : 0);
   const pct   = total === 0 ? 0 : Math.round(done / total * 100);
   document.getElementById('checklist-progress-bar').innerHTML = `
     <div class="checklist-progress">
@@ -927,6 +1051,43 @@ function printChecklist() {
   window.print();
   document.querySelectorAll('.panel').forEach(p => p.style.display = '');
   switchTab('checklist');
+}
+
+// ── ORDER INFO SYNC ───────────────────────────────────────
+function fmtTime(t) {
+  if (!t) return '';
+  const [h, m] = t.split(':');
+  const hr = parseInt(h);
+  const ampm = hr >= 12 ? 'PM' : 'AM';
+  const hr12 = hr % 12 || 12;
+  return hr12 + ':' + m + ' ' + ampm;
+}
+function fmtDate(d) {
+  if (!d) return '';
+  const [y, mo, day] = d.split('-');
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return months[parseInt(mo)-1] + ' ' + parseInt(day) + ', ' + y;
+}
+function updatePrintHeaders() {
+  const name   = document.getElementById('order-name').value || 'Unnamed Order';
+  const date   = fmtDate(document.getElementById('order-date').value);
+  const time   = fmtTime(document.getElementById('order-time').value);
+  const guests = parseInt(document.getElementById('order-guests').value) || 0;
+  const plates = document.getElementById('plates-check').checked;
+  ['build','checklist'].forEach(id => {
+    const n = document.getElementById('poh-' + id + '-name');
+    const d = document.getElementById('poh-' + id + '-date');
+    const t = document.getElementById('poh-' + id + '-time');
+    const g = document.getElementById('poh-' + id + '-guests');
+    if (n) n.textContent = name;
+    if (d) d.textContent = date || '—';
+    if (t) t.textContent = time || '—';
+    if (g) g.textContent = guests > 0 ? guests + ' guests' + (plates ? ' (plates & silverware)' : '') : '';
+  });
+  // Re-render checklist if it's visible so plates row updates live
+  if (document.getElementById('panel-checklist').classList.contains('active')) {
+    renderChecklist();
+  }
 }
 
 // ── INIT ─────────────────────────────────────────────────
