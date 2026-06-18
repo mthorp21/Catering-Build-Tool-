@@ -347,6 +347,42 @@
   .checklist-actions { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
 
   /* ── Print ───────────────────────────────────────────── */
+
+  /* ── Build Sheet Checklist ──────────────────────────── */
+  .build-order-summary { max-width: 700px; }
+  .build-cat-block { margin-bottom: 16px; }
+  .build-cat-header {
+    padding: 7px 14px;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
+    text-transform: uppercase; color: #ffffff;
+    border-radius: 6px 6px 0 0;
+  }
+  .build-dish-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 9px 14px;
+    border: 1px solid #dde3e1; border-top: none;
+  }
+  .build-cat-block .build-dish-row:last-child {
+    border-radius: 0 0 6px 6px;
+  }
+  .build-check-box {
+    width: 20px; height: 20px; flex-shrink: 0;
+    border: 1.5px solid #dde3e1; border-radius: 4px;
+    background: #ffffff;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .build-check-tick { display: none; }
+  .build-dish-label { flex: 1; font-size: 13px; font-weight: 500; color: #2a2a2a; }
+  .build-dish-qty {
+    font-size: 13px; font-weight: 700; color: #3c5c68;
+    min-width: 36px; text-align: right;
+  }
+  .tort-badge {
+    font-size: 10px; font-weight: 600;
+    background: #fff8e1; color: #b07d2a;
+    padding: 2px 8px; border-radius: 10px;
+  }
+
   @media print {
     body { background: white; font-size: 11px; }
     .tabs, .top-bar, .order-actions, .checklist-actions, .btn, .qty-btn, .qty-wrap { display: none !important; }
@@ -708,76 +744,61 @@ function renderBuild() {
     return;
   }
 
-  // Aggregate utensils & containers
+  const cats = [...new Set(selected.map(d => d.cat))];
+  let html = '<div class="build-order-summary">';
+
+  cats.forEach(cat => {
+    const cc = CAT_COLORS[cat] || { bg: '#3c5c68' };
+    const catDishes = selected.filter(d => d.cat === cat);
+    html += `<div class="build-cat-block">
+      <div class="build-cat-header" style="background:${cc.bg}">${cat}</div>`;
+    catDishes.forEach((d, idx) => {
+      const hasTort = d.tortillas && tortState[d.id];
+      const bg = idx % 2 === 0 ? '#f7f7f7' : '#ffffff';
+      html += `<div class="build-dish-row" style="background:${bg}">
+        <div class="build-check-box"><span class="build-check-tick">✓</span></div>
+        <span class="build-dish-label">${d.name}</span>
+        <span class="build-dish-qty">×${state[d.id]}</span>
+        ${hasTort ? '<span class="tort-badge">+ Tortillas</span>' : ''}
+      </div>`;
+    });
+    html += '</div>';
+  });
+  html += '</div>';
+
+  // Utensil + container totals
   const utensils = {};
   const containers = {};
-
-  let html = '';
   selected.forEach(d => {
     const qty = state[d.id];
     const hasTort = d.tortillas && tortState[d.id];
-    const cc = CAT_COLORS[d.cat] || { bg: '#3c5c68' };
-    const allRows = [
-      ...d.items,
+    const rows = [
       ...(d.containers || []),
       ...(d.utensils || []),
-      ...(d.optional || []),
       ...(hasTort ? TORTILLA_ITEMS.map(t => [t.name, t.cat, t.base, t.unit]) : [])
     ];
-
-    html += `<div class="build-section">
-      <div class="build-dish-header" style="background:${cc.bg}">
-        <span>${d.name}</span>
-        <span class="qty-badge">×${qty}</span>
-      </div>
-      <table class="build-table">
-        <thead><tr>
-          <th style="width:42%">Item</th>
-          <th>Type</th>
-          <th class="r">Per Order</th>
-          <th>Unit</th>
-          <th class="r">Total Needed</th>
-        </tr></thead>
-        <tbody>`;
-
-    allRows.forEach(([name, cat, base, unit]) => {
-      const total = fmtNum(base * qty);
-      const badgeClass = `badge-${cat.toLowerCase()}`;
-      html += `<tr>
-        <td>${name}</td>
-        <td><span class="badge ${badgeClass}">${cat}</span></td>
-        <td class="r">${fmtNum(base)}</td>
-        <td>${unit}</td>
-        <td class="total">${total}</td>
-      </tr>`;
-
-      if (cat === 'Utensil') {
-        utensils[name] = (utensils[name] || 0) + (base * qty);
-      }
-      if (cat === 'Container') {
-        containers[name] = (containers[name] || 0) + (base * qty);
-      }
+    rows.forEach(([name, cat, base]) => {
+      if (cat === 'Utensil') utensils[name] = (utensils[name] || 0) + base * qty;
+      if (cat === 'Container') containers[name] = (containers[name] || 0) + base * qty;
     });
-
-    html += `</tbody></table></div>`;
   });
 
-  // Summary
-  html += `<div class="summary-section">
-    <div class="summary-header">Utensil & Container Summary — All Ordered Dishes</div>
-    <div class="summary-sub-header summary-utensil-hdr">Utensils</div>`;
+  html += '<div class="summary-section" style="margin-top:20px"><div class="summary-header">Utensil & Container Totals</div>';
+  html += '<div class="summary-sub-header summary-utensil-hdr">Utensils</div>';
   Object.entries(utensils).forEach(([name, total], i) => {
-    html += `<div class="summary-row"><span class="summary-name">${name}</span>
-      <span class="badge badge-utensil">Utensil</span>
-      <span class="summary-total">${fmtNum(total)}</span></div>`;
+    html += `<div class="summary-row" style="background:${i%2===0?'#f7f7f7':'#ffffff'}">
+      <span class="summary-name">${name}</span>
+      <span class="summary-total">${fmtNum(total)}</span>
+    </div>`;
   });
-  html += `<div class="summary-sub-header summary-container-hdr">Containers</div>`;
-  Object.entries(containers).forEach(([name, total]) => {
-    html += `<div class="summary-row"><span class="summary-name">${name}</span>
-      <span class="badge badge-container">Container</span>
-      <span class="summary-total">${fmtNum(total)}</span></div>`;
+  html += '<div class="summary-sub-header summary-container-hdr">Containers</div>';
+  Object.entries(containers).forEach(([name, total], i) => {
+    html += `<div class="summary-row" style="background:${i%2===0?'#f7f7f7':'#ffffff'}">
+      <span class="summary-name">${name}</span>
+      <span class="summary-total">${fmtNum(total)}</span>
+    </div>`;
   });
-  html += `</div>`;
+  html += '</div>';
 
   container.innerHTML = html;
 }
