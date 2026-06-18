@@ -744,85 +744,10 @@ function renderBuild() {
     return;
   }
 
-  const cats = [...new Set(selected.map(d => d.cat))];
-  let html = '<div class="build-order-summary">';
-
-  cats.forEach(cat => {
-    const cc = CAT_COLORS[cat] || { bg: '#3c5c68' };
-    const catDishes = selected.filter(d => d.cat === cat);
-    html += `<div class="build-cat-block">
-      <div class="build-cat-header" style="background:${cc.bg}">${cat}</div>`;
-    catDishes.forEach((d, idx) => {
-      const hasTort = d.tortillas && tortState[d.id];
-      const bg = idx % 2 === 0 ? '#f7f7f7' : '#ffffff';
-      html += `<div class="build-dish-row" style="background:${bg}">
-        <div class="build-check-box"><span class="build-check-tick">✓</span></div>
-        <span class="build-dish-label">${d.name}</span>
-        <span class="build-dish-qty">×${state[d.id]}</span>
-        ${hasTort ? '<span class="tort-badge">+ Tortillas</span>' : ''}
-      </div>`;
-    });
-    html += '</div>';
-  });
-  html += '</div>';
-
-  // Utensil + container totals
   const utensils = {};
   const containers = {};
-  selected.forEach(d => {
-    const qty = state[d.id];
-    const hasTort = d.tortillas && tortState[d.id];
-    const rows = [
-      ...(d.containers || []),
-      ...(d.utensils || []),
-      ...(hasTort ? TORTILLA_ITEMS.map(t => [t.name, t.cat, t.base, t.unit]) : [])
-    ];
-    rows.forEach(([name, cat, base]) => {
-      if (cat === 'Utensil') utensils[name] = (utensils[name] || 0) + base * qty;
-      if (cat === 'Container') containers[name] = (containers[name] || 0) + base * qty;
-    });
-  });
-
-  html += '<div class="summary-section" style="margin-top:20px"><div class="summary-header">Utensil & Container Totals</div>';
-  html += '<div class="summary-sub-header summary-utensil-hdr">Utensils</div>';
-  Object.entries(utensils).forEach(([name, total], i) => {
-    html += `<div class="summary-row" style="background:${i%2===0?'#f7f7f7':'#ffffff'}">
-      <span class="summary-name">${name}</span>
-      <span class="summary-total">${fmtNum(total)}</span>
-    </div>`;
-  });
-  html += '<div class="summary-sub-header summary-container-hdr">Containers</div>';
-  Object.entries(containers).forEach(([name, total], i) => {
-    html += `<div class="summary-row" style="background:${i%2===0?'#f7f7f7':'#ffffff'}">
-      <span class="summary-name">${name}</span>
-      <span class="summary-total">${fmtNum(total)}</span>
-    </div>`;
-  });
-  html += '</div>';
-
-  container.innerHTML = html;
-}
-
-// ── CHECKLIST RENDER ──────────────────────────────────────
-function renderChecklist() {
-  const selected = DISHES.filter(d => state[d.id] > 0);
-  const progressEl = document.getElementById('checklist-progress-bar');
-  const contentEl = document.getElementById('checklist-content');
-
-  if (selected.length === 0) {
-    progressEl.innerHTML = '';
-    contentEl.innerHTML = `<div class="empty-build">
-      <div class="icon">✅</div>
-      <p>No items selected</p>
-      <small>Go to Order Entry and enter quantities first.</small>
-    </div>`;
-    return;
-  }
-
-  // Build progress
-  updateProgress(selected);
-
   let html = '';
+
   selected.forEach(d => {
     const qty = state[d.id];
     const hasTort = d.tortillas && tortState[d.id];
@@ -835,25 +760,103 @@ function renderChecklist() {
       ...(hasTort ? TORTILLA_ITEMS.map(t => [t.name, t.cat, t.base, t.unit]) : [])
     ];
 
+    html += `<div class="build-section">
+      <div class="build-dish-header" style="background:${cc.bg}">
+        <span>${d.name}</span>
+        <span class="qty-badge">×${qty}</span>
+      </div>
+      <table class="build-table">
+        <thead><tr>
+          <th style="width:42%">Item</th>
+          <th>Type</th>
+          <th class="r">Per Order</th>
+          <th>Unit</th>
+          <th class="r">Total Needed</th>
+        </tr></thead>
+        <tbody>`;
+
+    allRows.forEach(([name, cat, base, unit]) => {
+      const total = fmtNum(base * qty);
+      const badgeClass = 'badge-' + cat.toLowerCase();
+      html += `<tr>
+        <td>${name}</td>
+        <td><span class="badge ${badgeClass}">${cat}</span></td>
+        <td class="r">${fmtNum(base)}</td>
+        <td>${unit}</td>
+        <td class="total">${total}</td>
+      </tr>`;
+      if (cat === 'Utensil')   utensils[name]   = (utensils[name]   || 0) + base * qty;
+      if (cat === 'Container') containers[name] = (containers[name] || 0) + base * qty;
+    });
+
+    html += '</tbody></table></div>';
+  });
+
+  // Summary
+  html += '<div class="summary-section" style="margin-top:20px"><div class="summary-header">Utensil & Container Totals — All Ordered Dishes</div>';
+  html += '<div class="summary-sub-header summary-utensil-hdr">Utensils</div>';
+  Object.entries(utensils).forEach(([name, total], i) => {
+    html += `<div class="summary-row" style="background:${i%2===0?'#f7f7f7':'#ffffff'}">
+      <span class="summary-name">${name}</span>
+      <span class="badge badge-utensil" style="margin-right:8px">Utensil</span>
+      <span class="summary-total">${fmtNum(total)}</span></div>`;
+  });
+  html += '<div class="summary-sub-header summary-container-hdr">Containers</div>';
+  Object.entries(containers).forEach(([name, total], i) => {
+    html += `<div class="summary-row" style="background:${i%2===0?'#f7f7f7':'#ffffff'}">
+      <span class="summary-name">${name}</span>
+      <span class="badge badge-container" style="margin-right:8px">Container</span>
+      <span class="summary-total">${fmtNum(total)}</span></div>`;
+  });
+  html += '</div>';
+
+  container.innerHTML = html;
+}
+
+// ── CHECKLIST RENDER ──────────────────────────────────────
+function renderChecklist() {
+  const selected = DISHES.filter(d => state[d.id] > 0);
+  const progressEl = document.getElementById('checklist-progress-bar');
+  const contentEl  = document.getElementById('checklist-content');
+
+  if (selected.length === 0) {
+    progressEl.innerHTML = '';
+    contentEl.innerHTML = `<div class="empty-build">
+      <div class="icon">✅</div>
+      <p>No items selected</p>
+      <small>Go to Order Entry and enter quantities first.</small>
+    </div>`;
+    return;
+  }
+
+  updateProgress(selected);
+
+  const cats = [...new Set(selected.map(d => d.cat))];
+  let html = '';
+
+  cats.forEach(cat => {
+    const cc = CAT_COLORS[cat] || { bg: '#3c5c68' };
+    const catDishes = selected.filter(d => d.cat === cat);
     html += `<div class="checklist-dish">
       <div class="checklist-dish-header" style="background:${cc.bg}">
-        <span>${d.name}</span><span>×${qty}</span>
+        <span>${cat}</span>
       </div>
       <div class="checklist-items">`;
 
-    allRows.forEach(([name, cat, base, unit], idx) => {
-      const key = `${d.id}__${idx}`;
+    catDishes.forEach((d, idx) => {
+      const key = d.id;
       const isChecked = checked[key] || false;
-      const total = fmtNum(base * qty);
-      html += `<div class="check-row${isChecked ? ' checked' : ''}" onclick="toggleCheck('${key}')" data-key="${key}">
+      const hasTort = d.tortillas && tortState[d.id];
+      const bg = idx % 2 === 0 ? '#f7f7f7' : '#ffffff';
+      html += `<div class="check-row${isChecked ? ' checked' : ''}" onclick="toggleCheck('${key}')" data-key="${key}" style="background:${isChecked?'#d6f0c2':bg}">
         <div class="check-box"><span class="check-box-tick">✓</span></div>
-        <span class="check-item-name">${name}</span>
-        <span class="check-qty">${total}</span>
-        <span class="check-unit">${unit}</span>
+        <span class="check-item-name">${d.name}</span>
+        <span class="check-qty">×${state[d.id]}</span>
+        ${hasTort ? '<span class="tort-badge" style="font-size:10px;background:#fff8e1;color:#b07d2a;padding:2px 7px;border-radius:10px;font-weight:600">+ Tortillas</span>' : ''}
       </div>`;
     });
 
-    html += `</div></div>`;
+    html += '</div></div>';
   });
 
   contentEl.innerHTML = html;
@@ -861,36 +864,26 @@ function renderChecklist() {
 
 function toggleCheck(key) {
   checked[key] = !checked[key];
-  const row = document.querySelector(`[data-key="${key}"]`);
-  if (row) row.classList.toggle('checked', checked[key]);
+  const rows = document.querySelectorAll('[data-key="' + key + '"]');
+  rows.forEach(row => {
+    row.classList.toggle('checked', checked[key]);
+    if (!row.style.background || row.style.background !== '') {
+      row.style.background = checked[key] ? '#d6f0c2' : '';
+    }
+  });
   const selected = DISHES.filter(d => state[d.id] > 0);
   updateProgress(selected);
 }
 
 function updateProgress(selected) {
-  let total = 0, done = 0;
-  selected.forEach(d => {
-    const qty = state[d.id];
-    const hasTort = d.tortillas && tortState[d.id];
-    const allRows = [
-      ...d.items,
-      ...(d.containers||[]),
-      ...(d.utensils||[]),
-      ...(d.optional||[]),
-      ...(hasTort ? TORTILLA_ITEMS.map(t=>[t.name,t.cat,t.base,t.unit]):[])
-    ];
-    allRows.forEach((_, idx) => {
-      const key = `${d.id}__${idx}`;
-      total++;
-      if (checked[key]) done++;
-    });
-  });
-  const pct = total === 0 ? 0 : Math.round(done / total * 100);
+  const total = selected.length;
+  const done  = selected.filter(d => checked[d.id]).length;
+  const pct   = total === 0 ? 0 : Math.round(done / total * 100);
   document.getElementById('checklist-progress-bar').innerHTML = `
     <div class="checklist-progress">
-      <div class="progress-stat"><div class="num stat-green">${done}</div><div class="lbl">Checked</div></div>
+      <div class="progress-stat"><div class="num stat-green">${done}</div><div class="lbl">Done</div></div>
       <div class="progress-stat"><div class="num stat-coral">${total - done}</div><div class="lbl">Remaining</div></div>
-      <div class="progress-stat"><div class="num stat-teal">${total}</div><div class="lbl">Total Items</div></div>
+      <div class="progress-stat"><div class="num stat-teal">${total}</div><div class="lbl">Total</div></div>
       <div class="progress-bar-wrap">
         <div class="progress-bar-track"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
         <div class="progress-pct">${pct}% complete</div>
@@ -900,7 +893,10 @@ function updateProgress(selected) {
 
 function uncheckAll() {
   Object.keys(checked).forEach(k => checked[k] = false);
-  document.querySelectorAll('.check-row.checked').forEach(r => r.classList.remove('checked'));
+  document.querySelectorAll('.check-row').forEach(r => {
+    r.classList.remove('checked');
+    r.style.background = '';
+  });
   const selected = DISHES.filter(d => state[d.id] > 0);
   updateProgress(selected);
 }
